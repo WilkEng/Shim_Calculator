@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1, minimum-scale=1, shrink-to-fit=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="stylesheet" type="text/css" href="/stylesheet.css">
+  <title>Trackside Aligner</title>
+  <style>
+
+    /* ---- Theme: match Trackside Aligner GUI ---- */
+    :root {
+      --bg: #e5eaeb;
+      --text: #1a1a1a;
+      --muted: #555;
+      --line: #c8c8c8;
+      --panel: #ffffff;
+      --panel2: #f0f0f0;
+      --accent: #09a989;
+      --green: #16a34a;
+      --red: #dc2626;
+      --foot: #6b7280;
+      --ball: #cbd5e1;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.25;
+      overflow-x: hidden;
+    }
+
+    .wrap { max-width: 980px; margin: 0 auto; padding: 12px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 560px);
+      gap: 12px;
+      align-items: stretch;
+      justify-content: center;
+    }
+    @media (min-width: 921px) {
+      .grid { grid-template-rows: auto 1fr; }
+      .inputCard  { grid-column: 1; grid-row: 1; }
+      .vizCard    { grid-column: 2; grid-row: 1 / 3; }
+      .outputCard { grid-column: 1; grid-row: 2; }
+    }
+    @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0.2rem 0.2rem 0.4rem rgba(195,193,198,0.5), -0.1rem -0.1rem 0.3rem #fff;
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
+    }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 420px) { .row { grid-template-columns: 1fr; } }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 6px;
+      font-weight: 500;
+    }
+
+    input, select {
+      width: 100%;
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 10px;
+      outline: none;
+      font-size: 16px;         /* 16px prevents iOS auto-zoom */
+      font-family: inherit;
+    }
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(9, 169, 137, 0.18);
+    }
+
+    .k {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+    .k span:first-child { color: var(--muted); }
+    .k strong { font-weight: 800; }
+
+    .smalltbl { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+    .smalltbl td { padding: 6px 0; border-bottom: 1px solid var(--line); }
+    .smalltbl tr:last-child td { border-bottom: 0; }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--panel2);
+      margin-top: 10px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    .vizCard { padding: 10px; display: flex; flex-direction: column; }
+
+    svg {
+      display: block;
+      width: 100%;
+      flex: 1 1 auto;
+      min-height: 440px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .err { color: #b91c1c; font-size: 12px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="grid">
+      <section class="card inputCard">
+        <h2>Inputs</h2>
+        <div class="row">
+          <div>
+            <label for="diam">Wheel diameter (mm)</label>
+            <input id="diam" type="number" step="5" value="680" />
+          </div>
+          <div>
+            <label for="et">ET (mm)</label>
+            <input id="et" type="number" step="2.5" value="12.5" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <div>
+            <label for="ball">Ball</label>
+            <select id="ball">
+              <option value="standard">Ball</option>
+              <option value="loadcell">Loadcell ball</option>
+            </select>
+          </div>
+          <div>
+            <label for="foot">Foot</label>
+            <select id="foot">
+              <option value="standard">Foot</option>
+              <option value="v2">Compact foot</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="card vizCard">
+        <svg id="viz" viewBox="0 0 650 600" aria-label="assembly visual"></svg>
+      </section>
+
+      <section class="card outputCard">
+        <h2>Results</h2>
+        <div class="k"><span>Foot position</span><strong id="footPos">&mdash;</strong></div>
+        <div class="k"><span>Ball position</span><strong id="ballPos">&mdash;</strong></div>
+        <div class="k"><span>Green stack</span><strong class="mono" id="gSum">&mdash;</strong></div>
+        <div class="k"><span>Red stack</span><strong class="mono" id="rSum">&mdash;</strong></div>
+
+        <table class="smalltbl">
+          <tr><td><span style="color:var(--muted)">Green shims</span></td><td class="mono" style="text-align:right" id="gCounts">&mdash;</td></tr>
+          <tr><td><span style="color:var(--muted)">Red shims</span></td><td class="mono" style="text-align:right" id="rCounts">&mdash;</td></tr>
+        </table>
+
+        <div class="pill" id="statusPill"><span class="dot" id="statusDot" style="background:#16a34a"></span><span id="statusText">OK</span></div>
+        <div class="err" id="errText" style="display:none"></div>
+      </section>
+    </div>
+  </div>
+
+<script>
+/* ---- No-op sendValues: parent polls in CAMBER mode (mode 1) to keep the
+       device active and battery/status streaming.  Data is not used here. ---- */
+function sendValues() { /* intentionally empty */ }
+
+(() => {
+  // ------------------------ Model constants ------------------------
+  const FOOT_POSITIONS = [
+    { pos: 'A', baseStdDiam: 600 },
+    { pos: 'B', baseStdDiam: 630 },
+    { pos: 'C', baseStdDiam: 660 },
+    { pos: 'D', baseStdDiam: 690 },
+  ];
+
+  const ET_POSITIONS = [
+    { pos: 'A', baseET: 0 },
+    { pos: 'B', baseET: 27.5 },
+  ];
+
+  const GREEN_SIZES = [10, 5, 2.5, 1];
+  const RED_SIZES   = [10, 5, 2.5];
+
+  const MAX_RED_SHIM = 27.5;
+
+  // Foot outlines (from SVGs)
+  const FOOT_OUTLINES = {
+    v1: {
+      // A/B (horizontal leg at TOP, notch at bottom-right)
+      bottom: {
+        viewW: 42.808238, viewH: 27.150286,
+        mountY: 19.821526,
+        d: "M 4.7913969e-7,27.150282 V -4.0096743e-6 H 14.991334 15.324647 42.80824 V 19.821526 H 15.324647 v 7.328756 z"
+      },
+      // C/D (horizontal leg at BOTTOM, notch at top-right)
+      top: {
+        viewW: 42.808238, viewH: 27.150286,
+        mountY: 27.150286,
+        d: "M 4.7913969e-7,-4.0096743e-6 V 27.150282 H 14.991334 15.324647 42.80824 V 7.328756 H 15.324647 V -4.0096743e-6 Z"
+      },
+    },
+    v2: {
+      bottom: {
+        viewW: 42.807719, viewH: 27.150797,
+        mountY: 19.821525,
+        d: "M -1.6388478e-6,27.150794 V -3.7380502e-6 H 15.324129 V 2.3321542 H 42.807722 V 19.821525 H 15.324129 v 7.329269 z"
+      },
+      top: {
+        viewW: 42.807719, viewH: 27.150797,
+        mountY: 24.818636,
+        d: "M -1.6388478e-6,-3.7380502e-6 V 27.150794 H 15.324129 V 24.818636 H 42.807722 V 7.3292652 H 15.324129 V -3.7380502e-6 Z"
+      },
+    }
+  };
+
+  // Ball outline (from ball.svg)
+  const BALL = {
+    viewW: 29.916519,
+    viewH: 37.218918,
+    d: "M 2.1197585,-9.8658577e-6 C 0.94524658,-9.8658577e-6 -8.4210247e-6,0.94576014 -8.4210247e-6,2.1202702 V 27.79674 c 0,1.17451 0.9452550010247,2.11977 2.1197669210247,2.11977 h 2.764173 A 10.600291,10.600291 0 0 0 14.958252,37.2189 10.600291,10.600291 0 0 0 25.032056,29.91651 h 2.764172 c 1.174513,0 2.120284,-0.94526 2.120284,-2.11977 V 2.1202702 c 0,-1.17451006 -0.945771,-2.1202800658577 -2.120284,-2.1202800658577 z"
+  };
+
+  // ------------------------ Helpers ------------------------
+  const el = (id) => document.getElementById(id);
+
+  function clampNum(x){
+    const n = Number(x);
+    return Number.isFinite(n) ? n : NaN;
+  }
+
+  function roundToStep(val, step){
+    if (!Number.isFinite(val) || !Number.isFinite(step) || step <= 0) return val;
+    return Math.round(val / step) * step;
+  }
+
+  function fmt(n, digits=2){
+    if (!Number.isFinite(n)) return '\u2014';
+    const p = Math.pow(10, digits);
+    return (Math.round(n * p) / p).toFixed(digits);
+  }
+
+  function bestFitStack(target, sizes, maxSum){
+    const withOnes = sizes.includes(1);
+    let best = null;
+
+    function consider(counts){
+      const sum = counts.reduce((acc, n, i) => acc + n * sizes[i], 0);
+      const err = sum - target;
+      const absErr = Math.abs(err);
+      const totalPieces = counts.reduce((a,b)=>a+b,0);
+      const onesIdx = withOnes ? sizes.indexOf(1) : -1;
+      const onesCount = onesIdx >= 0 ? counts[onesIdx] : 0;
+      const rank = [absErr, totalPieces, onesCount];
+
+      if (!best) { best = { sum, err, absErr, totalPieces, onesCount, counts:[...counts], rank }; return; }
+      for (let i=0;i<rank.length;i++){
+        if (rank[i] < best.rank[i]) { best = { sum, err, absErr, totalPieces, onesCount, counts:[...counts], rank }; return; }
+        if (rank[i] > best.rank[i]) return;
+      }
+      for (let i=0;i<sizes.length;i++){
+        if (counts[i] > best.counts[i]) { best = { sum, err, absErr, totalPieces, onesCount, counts:[...counts], rank }; return; }
+        if (counts[i] < best.counts[i]) return;
+      }
+    }
+
+    const s0 = sizes[0], s1 = sizes[1] || null, s2 = sizes[2] || null, s3 = sizes[3] || null;
+    const n0Max = Math.floor(maxSum / s0);
+    for (let n0=0;n0<=n0Max;n0++){
+      const rem0 = maxSum - n0*s0;
+      const n1Max = s1 ? Math.floor(rem0 / s1) : 0;
+      for (let n1=0;n1<=n1Max;n1++){
+        const rem1 = rem0 - n1*(s1||0);
+        const n2Max = s2 ? Math.floor(rem1 / s2) : 0;
+        for (let n2=0;n2<=n2Max;n2++){
+          const rem2 = rem1 - n2*(s2||0);
+          const n3Max = s3 ? Math.floor(rem2 / s3) : 0;
+          for (let n3=0;n3<=n3Max;n3++){
+            const counts = sizes.length===4 ? [n0,n1,n2,n3]
+                        : sizes.length===3 ? [n0,n1,n2]
+                        : [n0];
+            consider(counts);
+          }
+        }
+      }
+    }
+    return best;
+  }
+
+  function computeGreen(targetDiam, ballVersion, footVersion){
+    const ballDelta = (ballVersion === 'loadcell') ? 24 : 0;
+    const maxShim = (ballVersion === 'loadcell') ? 20 : 15;
+    const footV2 = (footVersion === 'v2');
+
+    const candidates = [];
+    for (const fp of FOOT_POSITIONS){
+      const footDelta = (footV2 && (fp.pos === 'C' || fp.pos === 'D')) ? -20 : 0;
+      const reqShim = (targetDiam - fp.baseStdDiam - ballDelta - footDelta) / 2;
+      if (!Number.isFinite(reqShim)) continue;
+      if (reqShim < 0 || reqShim > maxShim) continue;
+
+      const stack = bestFitStack(reqShim, GREEN_SIZES, maxShim);
+      const diamResidual = 2 * (stack.sum - reqShim);
+      candidates.push({ pos: fp.pos, reqShim, maxShim, stack, diamResidual, absDiamResidual: Math.abs(diamResidual) });
+    }
+
+    if (!candidates.length) return { ok:false, reason:'No valid solution for diameter with any foot position.' };
+
+    candidates.sort((a,b)=>{
+      if (a.absDiamResidual !== b.absDiamResidual) return a.absDiamResidual - b.absDiamResidual;
+      if (a.stack.totalPieces !== b.stack.totalPieces) return a.stack.totalPieces - b.stack.totalPieces;
+      if (a.stack.onesCount !== b.stack.onesCount) return a.stack.onesCount - b.stack.onesCount;
+      return a.reqShim - b.reqShim;
+    });
+
+    return { ok:true, best:candidates[0] };
+  }
+
+  function computeRed(targetET){
+    const candidates = [];
+    for (const bp of ET_POSITIONS){
+      const req = targetET - bp.baseET;
+      if (!Number.isFinite(req)) continue;
+      if (req < 0 || req > MAX_RED_SHIM) continue;
+
+      const stack = bestFitStack(req, RED_SIZES, MAX_RED_SHIM);
+      const residual = stack.sum - req;
+      candidates.push({ pos:bp.pos, reqShim:req, stack, residual, absResidual: Math.abs(residual) });
+    }
+
+    if (!candidates.length) return { ok:false, reason:'No valid solution for ET with ball position A/B.' };
+
+    candidates.sort((a,b)=>{
+      if (a.absResidual !== b.absResidual) return a.absResidual - b.absResidual;
+      if (a.stack.totalPieces !== b.stack.totalPieces) return a.stack.totalPieces - b.stack.totalPieces;
+      return a.reqShim - b.reqShim;
+    });
+
+    return { ok:true, best:candidates[0] };
+  }
+
+  // ------------------------ Rendering ------------------------
+  function renderAssemblyViz(greenBest, redBest, ballVersion, footVersion){
+    const svg = el('viz');
+    svg.innerHTML = '';
+
+    const NS = 'http://www.w3.org/2000/svg';
+    const S = (tag, attrs={})=>{
+      const n = document.createElementNS(NS, tag);
+      for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, String(v));
+      return n;
+    };
+    const add = (node)=>{ svg.appendChild(node); return node; };
+
+    let W = 900;
+    const H = 600;
+
+    // Fixed ground reference: ball bottom always sits on this line
+    const groundY = 540;
+
+    const frameX = 70;
+    const frameW = 70;
+
+    // Foot outline selection
+    const footKey = (footVersion === 'v2') ? 'v2' : 'v1';
+    const orient  = (greenBest.pos === 'A' || greenBest.pos === 'B') ? 'bottom' : 'top';
+    const footO   = FOOT_OUTLINES[footKey][orient];
+
+    const pxPerMm = 7.0;
+    const footWpx = footO.viewW * pxPerMm;
+    const footHpx = footO.viewH * pxPerMm;
+
+    // Horizontal geometry: frame -> red shims -> foot
+    const redCounts = redBest.stack.counts;
+    const redScaleX = 2.2;
+
+    let x = frameX + frameW;
+    for (let i=0;i<RED_SIZES.length;i++){
+      const mm = RED_SIZES[i];
+      const c = redCounts[i] || 0;
+      for (let k=0;k<c;k++){
+        const w = Math.max(4, mm * redScaleX);
+        x += w;
+      }
+    }
+    const footX = x;
+
+    const rightEdgePx = footX + footWpx;
+
+    const shimW = 140;
+    const mountW = shimW * 0.86;
+
+    const B_INSET_MM = 0.0;
+    const AB_SPACING_MM = 16.0;
+
+    let mountCxB = rightEdgePx - (B_INSET_MM * pxPerMm) - mountW/2;
+    let mountCxA = mountCxB - (AB_SPACING_MM * pxPerMm);
+
+    const minCx = footX + mountW/2 + 6;
+    const maxCx = rightEdgePx - mountW/2 - 6;
+    mountCxA = Math.min(maxCx, Math.max(minCx, mountCxA));
+    mountCxB = Math.min(maxCx, Math.max(minCx, mountCxB));
+
+    const activeCx = (redBest.pos === 'B') ? mountCxB : mountCxA;
+    const inactiveCx = (redBest.pos === 'B') ? mountCxA : mountCxB;
+
+    // Ball (anchored to ground line)
+    const ballTargetW = shimW * 0.86;
+    let ballScale = ballTargetW / BALL.viewW;
+    if (ballVersion === 'loadcell') ballScale *= 1.18;
+
+    const ballWpx = BALL.viewW * ballScale;
+    const ballHpx = BALL.viewH * ballScale;
+
+    const ballX = activeCx - ballWpx/2;
+    const ballY = groundY - ballHpx;
+    const ballTopY = ballY;
+
+    // Green shims: stack ABOVE the ball
+    const gCounts = greenBest.stack.counts;
+    const gScaleY = 2.8;
+    const shimX = activeCx - shimW/2;
+
+    const hForMm = (mm)=>Math.max(5, mm * gScaleY);
+    const greenHeightPx =
+      hForMm(10)*(gCounts[0]||0) +
+      hForMm(5)*(gCounts[1]||0) +
+      hForMm(2.5)*(gCounts[2]||0) +
+      hForMm(1)*(gCounts[3]||0);
+
+    const yShimStart = ballTopY - greenHeightPx;
+    let yShim = yShimStart;
+
+    const mountY = yShimStart;
+
+    const footY = mountY - footO.mountY * pxPerMm;
+
+    const FRAME_SHIFT_PX = 32;
+    const frameShift = (greenBest.pos === 'A' || greenBest.pos === 'C') ? FRAME_SHIFT_PX : 0;
+
+    const frameBottom = (footY + footHpx) + frameShift;
+    const frameY = Math.max(20, frameBottom - 460);
+    const frameH = frameBottom - frameY;
+
+    // Draw frame
+    add(S('rect', {
+      x: frameX, y: frameY, width: frameW, height: frameH,
+      rx: 4,
+      fill: 'rgba(15,23,42,0.08)',
+      stroke: 'rgba(15,23,42,0.20)',
+      'stroke-width': 2
+    }));
+
+    // Draw red shims
+    x = frameX + frameW;
+    const redY = footY;
+    for (let i=0;i<RED_SIZES.length;i++){
+      const mm = RED_SIZES[i];
+      const c = redCounts[i] || 0;
+      for (let k=0;k<c;k++){
+        const w = Math.max(4, mm * redScaleX);
+        add(S('rect', {
+          x, y: redY, width: w, height: footHpx,
+          rx: 2,
+          fill: '#dc2626',
+          opacity: 0.90,
+          stroke: 'rgba(0,0,0,0.18)',
+          'stroke-width': 1
+        }));
+        x += w;
+      }
+    }
+
+    // Draw foot (real outline)
+    add(S('path', {
+      d: footO.d,
+      transform: "translate(" + footX + " " + footY + ") scale(" + pxPerMm + ")",
+      fill: '#6b7280',
+      opacity: 0.92,
+      stroke: 'rgba(0,0,0,0.20)',
+      'stroke-width': 1,
+      'vector-effect':'non-scaling-stroke'
+    }));
+
+    // Show both mounting positions (pads)
+    function pad(cx, active){
+      const padW = 120, padH = 10;
+      add(S('rect', {
+        x: cx - padW/2,
+        y: mountY - padH,
+        width: padW,
+        height: padH,
+        rx: 2,
+        fill: active ? 'rgba(22,163,74,0.18)' : 'rgba(15,23,42,0.05)',
+        stroke: active ? 'rgba(22,163,74,0.30)' : 'rgba(15,23,42,0.10)',
+        'stroke-width': 1
+      }));
+    }
+    pad(activeCx, true);
+    pad(inactiveCx, false);
+
+    function drawGreen(mm, count){
+      for (let i=0;i<count;i++){
+        const h = hForMm(mm);
+        add(S('rect', {
+          x: shimX, y: yShim, width: shimW, height: h,
+          rx: 3,
+          fill: '#16a34a',
+          opacity: 0.90,
+          stroke:'rgba(0,0,0,0.18)',
+          'stroke-width':1
+        }));
+        yShim += h;
+      }
+    }
+
+    drawGreen(10, gCounts[0]||0);
+    drawGreen(5,  gCounts[1]||0);
+    drawGreen(2.5,gCounts[2]||0);
+    drawGreen(1,  gCounts[3]||0);
+
+    // Tighten viewBox width
+    const maxX = Math.max(
+      frameX + frameW,
+      footX + footWpx,
+      shimX + shimW,
+      ballX + ballWpx
+    ) + 60;
+    W = Math.max(520, Math.ceil(maxX));
+    svg.setAttribute('viewBox', "0 0 " + W + " " + H);
+
+    // Ball (outline)
+    add(S('path', {
+      d: BALL.d,
+      transform: "translate(" + ballX + " " + ballY + ") scale(" + ballScale + ")",
+      fill: '#cbd5e1',
+      opacity: 0.92,
+      stroke: 'rgba(0,0,0,0.22)',
+      'stroke-width': 1,
+      'vector-effect':'non-scaling-stroke'
+    }));
+
+    // Ground line
+    add(S('line', {
+      x1: 20, x2: W-20,
+      y1: groundY, y2: groundY,
+      stroke: 'rgba(15,23,42,0.16)',
+      'stroke-width': 2
+    }));
+  }
+
+
+  // ------------------------ UI ------------------------
+  const inputs = {
+    diam: el('diam'),
+    et: el('et'),
+    ball: el('ball'),
+    foot: el('foot'),
+  };
+
+  function setStatus(ok, msg){
+    el('statusDot').style.background = ok ? '#16a34a' : '#b91c1c';
+    el('statusText').textContent = ok ? 'OK' : 'Check inputs';
+    el('errText').style.display = ok ? 'none' : 'block';
+    el('errText').textContent = ok ? '' : msg;
+  }
+
+  function update(){
+    let d = clampNum(inputs.diam.value);
+    let e = clampNum(inputs.et.value);
+
+    if (Number.isFinite(d)){
+      d = roundToStep(d, 5);
+      inputs.diam.value = String(d);
+    }
+    if (Number.isFinite(e)){
+      e = roundToStep(e, 2.5);
+      inputs.et.value = String(e);
+    }
+
+    if (!Number.isFinite(d) || !Number.isFinite(e)){
+      setStatus(false, 'Enter valid numbers for diameter and ET.');
+      el('footPos').textContent = el('ballPos').textContent = '\u2014';
+      el('gSum').textContent = el('rSum').textContent = '\u2014';
+      el('gCounts').textContent = el('rCounts').textContent = '\u2014';
+      el('viz').innerHTML = '';
+      return;
+    }
+
+    const ballV = inputs.ball.value;
+    const footV = inputs.foot.value;
+
+    const green = computeGreen(d, ballV, footV);
+    const red = computeRed(e);
+
+    if (!green.ok || !red.ok){
+      setStatus(false, ((!green.ok ? green.reason : '') + ' ' + (!red.ok ? red.reason : '')).trim());
+      el('footPos').textContent = green.ok ? green.best.pos : '\u2014';
+      el('ballPos').textContent = red.ok ? red.best.pos : '\u2014';
+      el('gSum').textContent = green.ok ? fmt(green.best.stack.sum,2) + ' mm' : '\u2014';
+      el('rSum').textContent = red.ok ? fmt(red.best.stack.sum,2) + ' mm' : '\u2014';
+      el('gCounts').textContent = green.ok ? '10\u00d7' + green.best.stack.counts[0] + '  5\u00d7' + green.best.stack.counts[1] + '  2.5\u00d7' + green.best.stack.counts[2] + '  1\u00d7' + green.best.stack.counts[3] : '\u2014';
+      el('rCounts').textContent = red.ok ? '10\u00d7' + red.best.stack.counts[0] + '  5\u00d7' + red.best.stack.counts[1] + '  2.5\u00d7' + red.best.stack.counts[2] : '\u2014';
+      el('viz').innerHTML = '';
+      return;
+    }
+
+    el('footPos').textContent = green.best.pos;
+    el('ballPos').textContent = red.best.pos;
+    el('gSum').textContent = fmt(green.best.stack.sum,2) + ' mm';
+    el('rSum').textContent = fmt(red.best.stack.sum,2) + ' mm';
+    el('gCounts').textContent = '10\u00d7' + green.best.stack.counts[0] + '  5\u00d7' + green.best.stack.counts[1] + '  2.5\u00d7' + green.best.stack.counts[2] + '  1\u00d7' + green.best.stack.counts[3];
+    el('rCounts').textContent = '10\u00d7' + red.best.stack.counts[0] + '  5\u00d7' + red.best.stack.counts[1] + '  2.5\u00d7' + red.best.stack.counts[2];
+
+    const ok = (Math.abs(green.best.diamResidual) < 0.01) && (Math.abs(red.best.residual) < 0.01);
+    setStatus(true, ok ? '' : 'Best fit (small residual).');
+
+    renderAssemblyViz(green.best, red.best, ballV, footV);
+  }
+
+  for (const k of Object.keys(inputs)){
+    inputs[k].addEventListener('change', update);
+    inputs[k].addEventListener('blur', update);
+  }
+
+  update();
+})();
+</script>
+</body>
+</html>
